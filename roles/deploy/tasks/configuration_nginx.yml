@@ -1,0 +1,48 @@
+  - name: "Change NGINX Cache dir permissions"
+    ansible.builtin.file:
+      path: "/var/cache/nginx"
+      state: directory
+      owner: nginx
+      group: nginx
+      mode: 0755 
+
+  - name: Check NGINX default config exists
+    ansible.builtin.stat:
+      path: "/etc/nginx/conf.d/default.conf"
+    register: check_file_name
+
+  - name: Copy file with new name
+    ansible.builtin.copy:
+      remote_src: true
+      src: "/etc/nginx/conf.d/default.conf"
+      dest: "/etc/nginx/conf.d/default.conf.bak"
+    when: check_file_name.stat.exists
+    
+  - name: Remove old file
+    ansible.builtin.file:
+      path: "/etc/nginx/conf.d/default.conf"
+      state: absent
+    when: check_file_name.stat.exists
+
+  - name: "Copy application config"
+    ansible.builtin.copy:
+      src: /var/www/{{ application_dir_name }}/config/nginx.conf
+      dest: /etc/nginx/nginx.conf
+      owner: nginx
+      group: nginx
+      mode: 0664
+      remote_src: true
+  
+  - name: "Update default config"
+    ansible.builtin.replace:
+      path: "/etc/nginx/nginx.conf"
+      regexp: "{{ item.regexp }}"
+      replace: "{{ item.line }}"
+    loop:
+      - regexp: '(.*)root \/(.*);$'
+        line: "root /var/www/{{ application_dir_name }}/public;"
+ 
+  - name: "Restart NGINX service"
+    service:
+      name: "nginx"
+      state: restarted

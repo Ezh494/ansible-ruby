@@ -1,0 +1,14 @@
+[Unit]
+Description=Ruby application
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/var/www/{{ application_name }}
+EnvironmentFile=/var/www/{{ application_name }}/environment
+ExecStart=/usr/bin/bash -lc 'bundle exec rake db:migrate RAILS_ENV=$RAILS_ENV && bundle exec puma -b unix:///var/run/puma.sock -e $RAILS_ENV config.ru'
+
+[Install]
+WantedBy=multi-user.target

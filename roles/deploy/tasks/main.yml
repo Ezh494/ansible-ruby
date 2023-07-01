@@ -1,0 +1,57 @@
+  - name: Prepare installation apps
+    include_tasks: "prepare.yml"
+
+  - name: Configuration nginx
+    include_tasks: "configuration_nginx.yml"
+
+  - name: Copy environment file
+    ansible.builtin.template:
+      src: environment.file.j2
+      dest: /var/www/{{ application_name }}/environment
+      owner: nginx
+      group: nginx
+      mode: 0664
+
+  - name: Copy service file
+    ansible.builtin.template:
+      src: service.service.j2
+      dest: /etc/systemd/system/{{ application_name }}.service
+      owner: nginx
+      group: nginx
+      mode: 0664
+
+  - name: Reload daemon service
+    ansible.builtin.systemd:
+      daemon_reload: true
+
+  - name: Install dependency
+    ansible.builtin.shell: 'bash -lc "bundle config build.nokogiri --use-system-libraries"'
+    args:
+      chdir: "/var/www/{{ application_dir_name }}"
+
+  - name: Install dependency2
+    ansible.builtin.shell: 'bash -lc "bundle install --clean --no-cache --without development"'
+    args:
+      chdir: "/var/www/{{ application_dir_name }}"
+    register: result
+    failed_when: "'Bundle complete!' not in result.stdout"
+
+  - name:  "Recursively change ownership Cache and logs directory"
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: directory
+      owner: nginx
+      group: nginx
+      mode: 0664
+      recurse: yes
+    loop:
+    - "/var/www/{{ application_dir_name }}/log"
+    - "/var/www/{{ application_dir_name }}/tmp"
+
+  - name: "Start service"
+    service:
+      name: "{{ application_name }}"
+      state: started
+  
+
+   

@@ -1,0 +1,75 @@
+  - name: Install packages
+    ansible.builtin.yum:
+      name:
+        - postgresql
+        - postgresql-server
+        - postgresql-contrib
+        - postgresql-libs
+        - postgresql-devel
+      state: present
+      
+  - name: Check if PostgreSQL is initialized
+    ansible.builtin.stat:
+      path: "/var/lib/pgsql/data/pg_hba.conf"
+    register: postgres_data
+
+  - name: Initialize PostgreSQL
+    ansible.builtin.shell: "postgresql-setup initdb"
+    when: not postgres_data.stat.exists
+
+  - name: Start and enable service
+    ansible.builtin.service:
+      name: postgresql
+      state: started
+      enabled: true
+       
+  - name: "Create app database"
+    postgresql_db:
+      state: present
+      name: "{{ postgres_db_name }}"
+    become: true
+    become_user: postgres
+    vars:
+      ansible_python_interpreter: /usr/bin/python3
+    
+  - name: "Create connection user" 
+    postgresql_user:
+      name: "{{ postgres_db_user }}"
+      role_attr_flags: "LOGIN" 
+      password: "{{ postgres_db_pass }}"
+    become: true
+    become_user: postgres
+    become_method: sudo
+    vars:
+      ansible_python_interpreter: /usr/bin/python3
+
+  - name: "Grant db user access to app db"
+    postgresql_privs:
+      type: database
+      database: "{{ postgres_db_name }}"
+      roles: "{{ postgres_db_user }}"
+      grant_option: no
+      privs: all
+    become: true
+    become_user: postgres
+    vars:
+      ansible_python_interpreter: /usr/bin/python3
+
+  - name: "Allow md5 connection for the db user"
+    postgresql_pg_hba:
+      dest: "~/data/pg_hba.conf"
+      contype: host
+      databases: all
+      method: md5
+      users: "{{ postgres_db_user }}"
+      create: true
+    become: true
+    become_user: postgres
+    vars:
+      ansible_python_interpreter: /usr/bin/python3
+
+  - name: "Restart PostgreSQL server"
+    ansible.builtin.service:
+      name: "postgresql"
+      state: restarted
+      enabled: yes

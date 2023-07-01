@@ -1,0 +1,78 @@
+  - name: Install GPG key for RVM
+    command: sudo gpg2 --keyserver hkp://keyserver.ubuntu.com --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3 7D2BAF1CF37B13E2069D6956105BD0E739499BDB
+    args:
+      creates: /root/.gnupg/secring.gpg
+
+  - name: Install RVM package manager
+    shell: curl -sSL https://get.rvm.io | bash
+
+  - name: Add RVM in shell
+    shell: source /etc/profile
+
+  - name: Install ruby
+    ansible.builtin.shell: 'bash -lc "rvm install ruby-{{ ruby_version }}-dev"'
+
+  - name: Change default version ruby
+    ansible.builtin.shell: 'bash -lc "rvm use {{ ruby_version }}-dev --default"'
+
+
+  - name: Install gems
+    ansible.builtin.shell: 'bash -lc "gem install {{ item }}"'
+    loop:
+    - "bundler:{{ bundler_version }}"
+    - "nokogiri:{{ nokogiri_version }}"
+    
+ # - name: Install bundler
+ #   community.general.gem:
+ #     name: bundler
+ #     version: "{{ bundler_version }}"
+ #     state: present
+ #     repository: "https://rubygems.org"
+ #     user_install: false
+ # 
+ # - name: Install nokogiri
+ #   community.general.gem: 
+ #     name: nokogiri_version
+ #     version: "{{ nokogiri_version }}"
+ #     state: present
+ #     repository: "https://rubygems.org"
+ #     user_install: false
+
+  - name: "Create application folder"
+    ansible.builtin.file:
+      path: /var/www/{{ application_dir_name }}
+      state: directory
+      mode: 0755
+      owner: nginx
+      group: nginx
+
+  - name: "Copy SSH key"
+    ansible.builtin.copy:
+      src: "{{ playbook_dir }}/files/{{ application_repo_keyname }}"
+      dest: "~/.ssh/"
+      owner: "{{ ansible_user_id }}"
+      group: "{{ ansible_user_id }}"
+      mode: 0600
+ 
+  - name: "Clone project"
+    ansible.builtin.git:
+      repo: "{{ application_repo }}"
+      dest: "/var/www/{{ application_dir_name }}"
+      key_file: "~/.ssh/{{ application_repo_keyname }}"
+      accept_hostkey: true
+      clone: true
+      update: "{{ application_update }}"
+
+  - name: "Remove SSH key"
+    ansible.builtin.file:
+      path: "~/.ssh/{{ application_repo_keyname }}"
+      state: absent
+
+  - name:  "Recursively change ownership site directory"
+    ansible.builtin.file:
+      path: "/var/www/{{ application_dir_name }}"
+      state: directory
+      owner: nginx
+      group: nginx
+      mode: 0664
+      recurse: yes

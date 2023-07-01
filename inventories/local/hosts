@@ -1,0 +1,7 @@
+[ruby]
+server01 ansible_host=192.168.66.70
+server02 ansible_host=192.168.66.72
+
+[ruby:vars]
+ansible_user=vagrant
+ansible_ssh_password=vagrant

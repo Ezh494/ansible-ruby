@@ -1,0 +1,63 @@
+---
+- name: 'Install and configuration Ruby application'
+  become: true
+  hosts: ruby
+  vars:
+    pre_packages:
+      - "@Development tools"
+      - ca-certificates
+      - curl
+      - gnupg
+      - gnupg2
+      - nodejs
+      - python3
+      - python3-pip
+      - python3-setuptools
+      - python3-psycopg2
+      - libselinux-python3
+      - libxml2-devel
+    postgres_users_no_log: true
+    postgres_db_name: xpaste_practicum
+    postgres_db_user: practicum
+    postgres_db_pass: !vault |
+          $ANSIBLE_VAULT;1.2;AES256;prod
+          33633830326662353935613134643335373439363161393262666330306164333661616633366261
+          6138626165313063373431376466383337316561393936340a363431373662616238343233326462
+          65623961343832666166386238333162643434363831333630346538343361356237643638343632
+          3938353737326637390a306431313533663530303262663932626437623065353564353235353639
+          3563
+    application_name: xpaste_practicum
+    application_dir_name: xpaste_practicum
+    application_repo: "git@gitlab.slurm.io:edu/xpaste_practicum.git"
+    application_repo_keyname: "gitlab-slurm"
+    application_update: no
+    application_secret_key_base: "5e6c87573fcdcaf510dec0376c8ad0dc7a2db199ba58d22471a52774b850df4511e5dbeaa94ef90f77d4839c7fc92cfc453419b7b2d63b9aeb7114deddca7529"
+  roles:
+    - geerlingguy.nginx
+    - postgres
+    - deploy
+
+  pre_tasks:
+  - name: "Install EPEL repository"
+    ansible.builtin.yum:
+      name: epel-release
+      update_cache: yes
+      state: latest
+
+  - name: "Install prerequisite"
+    ansible.builtin.yum:
+      name: "{{ pre_packages }}"
+      update_cache: true
+  
+  post_tasks:
+  - name: "Test availability site"
+    ansible.builtin.uri:
+      url: "http://{{ ansible_host }}"
+      return_content: true
+    register: site
+    until: "result.status == 200"
+    failed_when: "'xPaste' not in site.content"
+    delegate_to: 127.0.0.1
+    retries: 3
+    delay: 10
+    
